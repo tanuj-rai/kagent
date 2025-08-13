@@ -4,12 +4,11 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Loader2, Settings2 } from "lucide-react";
+import { Loader2} from "lucide-react";
 import { ModelConfig, MemoryResponse } from "@/types";
 import { SystemPromptSection } from "@/components/create/SystemPromptSection";
 import { ModelSelectionSection } from "@/components/create/ModelSelectionSection";
 import { ToolsSection } from "@/components/create/ToolsSection";
-import { MemorySelectionSection } from "@/components/create/MemorySelectionSection";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useAgents } from "@/components/AgentsProvider";
 import { LoadingState } from "@/components/LoadingState";
@@ -67,10 +66,6 @@ function AgentPageContent({ isEditMode, agentName, agentNamespace }: AgentPageCo
 
   // Tools state - now using AgentTool interface correctly
   const [selectedTools, setSelectedTools] = useState<Tool[]>([]);
-
-  // Memory state
-  const [availableMemories, setAvailableMemories] = useState<MemoryResponse[]>([]);
-  const [selectedMemories, setSelectedMemories] = useState<string[]>([]);
 
   // Overall form state
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -198,7 +193,6 @@ function AgentPageContent({ isEditMode, agentName, agentNamespace }: AgentPageCo
         description,
         modelName: selectedModel?.ref || "",
         tools: selectedTools,
-        memory: selectedMemories,
       };
 
       let result;
@@ -314,25 +308,6 @@ function AgentPageContent({ isEditMode, agentName, agentNamespace }: AgentPageCo
                   isSubmitting={isSubmitting || isLoading} 
                   onChange={(modelRef) => validateField('model', modelRef)}
                   agentNamespace={namespace}
-                />
-              </CardContent>
-            </Card>
-            <Card>
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2">
-                  <Settings2 className="h-5 w-5" />
-                  Memory
-                </CardTitle>
-                  <p className="text-xs mb-2 block text-muted-foreground">
-                    The memories that the agent will use to answer the user&apos;s questions.
-                  </p>
-              </CardHeader>
-              <CardContent>
-                <MemorySelectionSection
-                  availableMemories={availableMemories}
-                  selectedMemories={selectedMemories}
-                  onSelectionChange={setSelectedMemories}
-                  disabled={isSubmitting || isLoading}
                 />
               </CardContent>
             </Card>
