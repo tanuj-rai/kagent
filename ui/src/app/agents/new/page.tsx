@@ -17,7 +17,6 @@ import KagentLogo from "@/components/kagent-logo";
 import { AgentFormData } from "@/components/AgentsProvider";
 import { Tool } from "@/types";
 import { toast } from "sonner";
-import { listMemories } from "@/app/actions/memories";
 import { NamespaceCombobox } from "@/components/NamespaceCombobox";
 
 interface ValidationErrors {
