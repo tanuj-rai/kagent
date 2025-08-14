@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Loader2} from "lucide-react";
-import { ModelConfig, MemoryResponse } from "@/types";
+import { ModelConfig} from "@/types";
 import { SystemPromptSection } from "@/components/create/SystemPromptSection";
 import { ModelSelectionSection } from "@/components/create/ModelSelectionSection";
 import { ToolsSection } from "@/components/create/ToolsSection";
@@ -27,7 +27,6 @@ interface ValidationErrors {
   model?: string;
   knowledgeSources?: string;
   tools?: string;
-  memory?: string;
 }
 
 interface AgentPageContentProps {
