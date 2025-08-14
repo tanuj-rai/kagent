@@ -96,11 +96,6 @@ function AgentPageContent({ isEditMode, agentName, agentNamespace }: AgentPageCo
                 model: agentResponse.model,
                 ref: agentResponse.modelConfigRef,
               });
-
-              // Set selected memories if they exist
-              if (agentResponse.memoryRefs && Array.isArray(agentResponse.memoryRefs)) {
-                setSelectedMemories(agentResponse.memoryRefs);
-              }
             } catch (extractError) {
               console.error("Error extracting assistant data:", extractError);
               toast.error("Failed to extract agent data");
@@ -119,19 +114,6 @@ function AgentPageContent({ isEditMode, agentName, agentNamespace }: AgentPageCo
 
     fetchAgentData();
   }, [isEditMode, agentName, agentNamespace, getAgent]);
-
-  useEffect(() => {
-    const fetchMemories = async () => {
-      try {
-        const memories = await listMemories();
-        setAvailableMemories(memories);
-      } catch (error) {
-        console.error("Error fetching memories:", error);
-        toast.error("Failed to load available memories.");
-      }
-    };
-    fetchMemories();
-  }, []);
 
   const validateForm = () => {
     const formData = {
