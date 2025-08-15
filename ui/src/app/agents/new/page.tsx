@@ -58,6 +58,25 @@ function AgentPageContent({ isEditMode, agentName, agentNamespace }: AgentPageCo
 
   type SelectedModelType = Pick<ModelConfig, 'ref' | 'model'>;
 
+  interface FormState {
+    name: string;
+    namespace: string;
+    description: string;
+    agentType: AgentType;
+    systemPrompt: string;
+    selectedModel: SelectedModelType | null;
+    selectedTools: Tool[];
+    byoImage: string;
+    byoCmd: string;
+    byoArgs: string;
+    replicas: string;
+    imagePullPolicy: string;
+    imagePullSecrets: string[];
+    envPairs: { key: string; value: string }[];
+    isSubmitting: boolean;
+    isLoading: boolean;
+    errors: ValidationErrors;
+  }
 
   const [state, setState] = useState<FormState>({
     name: "",
