@@ -215,11 +215,21 @@ func (c *InMemmoryFakeClient) DeleteAgent(agentName string) error {
 }
 
 // DeleteToolServer deletes a tool server by name
-func (c *InMemmoryFakeClient) DeleteToolServer(serverName string) error {
+func (c *InMemmoryFakeClient) DeleteToolServer(serverName string, groupKind string) error {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 
 	delete(c.toolServers, serverName)
+	return nil
+}
+
+// DeleteToolsForServer deletes tools for a tool server by name
+
+func (c *InMemmoryFakeClient) DeleteToolsForServer(serverName string, groupKind string) error {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+
+	delete(c.tools, serverName)
 	return nil
 }
 
@@ -346,6 +356,7 @@ func (c *InMemmoryFakeClient) ListAgents() ([]database.Agent, error) {
 	for _, agent := range c.agents {
 		result = append(result, *agent)
 	}
+	sort.Slice(result, func(i, j int) bool { return result[i].ID < result[j].ID })
 	return result, nil
 }
 
@@ -358,6 +369,9 @@ func (c *InMemmoryFakeClient) ListToolServers() ([]database.ToolServer, error) {
 	for _, server := range c.toolServers {
 		result = append(result, *server)
 	}
+	sort.Slice(result, func(i, j int) bool {
+		return (result[i].Name + result[i].GroupKind) < (result[j].Name + result[j].GroupKind)
+	})
 	return result, nil
 }
 
@@ -370,6 +384,9 @@ func (c *InMemmoryFakeClient) ListTools() ([]database.Tool, error) {
 	for _, tool := range c.tools {
 		result = append(result, *tool)
 	}
+	sort.Slice(result, func(i, j int) bool {
+		return (result[i].ServerName + result[i].ID) < (result[j].ServerName + result[j].ID)
+	})
 	return result, nil
 }
 
@@ -389,6 +406,10 @@ func (c *InMemmoryFakeClient) ListToolsForServer(serverName string) ([]database.
 			result = append(result, *tool)
 		}
 	}
+
+	sort.Slice(result, func(i, j int) bool {
+		return (result[i].ServerName + result[i].ID) < (result[j].ServerName + result[j].ID)
+	})
 	return result, nil
 }
 

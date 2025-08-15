@@ -60,32 +60,46 @@ func (h *AgentsHandler) getAgentResponse(ctx context.Context, log logr.Logger, a
 	agentRef := common.GetObjectRef(agent)
 	log.V(1).Info("Processing Agent", "agentRef", agentRef)
 
-	// Get the ModelConfig for the team
-	modelConfig := &v1alpha2.ModelConfig{}
-	if err := h.KubeClient.Get(
-		ctx,
-		client.ObjectKey{
-			Namespace: agent.Namespace,
-			Name:      agent.Spec.ModelConfig,
-		},
-		modelConfig,
-	); err != nil {
-		modelConfigRef := common.GetObjectRef(modelConfig)
-		if k8serrors.IsNotFound(err) {
-			log.V(1).Info("ModelConfig not found", "modelConfigRef", modelConfigRef)
-		} else {
-			log.Error(err, "Failed to get ModelConfig", "modelConfigRef", modelConfigRef)
+	deploymentReady := false
+	for _, condition := range agent.Status.Conditions {
+		if condition.Type == "Ready" && condition.Reason == "DeploymentReady" && condition.Status == "True" {
+			deploymentReady = true
+			break
 		}
 	}
 
-	return api.AgentResponse{
-		ID:             common.ConvertToPythonIdentifier(agentRef),
-		Agent:          agent,
-		ModelProvider:  modelConfig.Spec.Provider,
-		Model:          modelConfig.Spec.Model,
-		ModelConfigRef: common.GetObjectRef(modelConfig),
-		Tools:          agent.Spec.Tools,
-	}, nil
+	response := api.AgentResponse{
+		ID:              common.ConvertToPythonIdentifier(agentRef),
+		Agent:           agent,
+		DeploymentReady: deploymentReady,
+	}
+
+	if agent.Spec.Type == v1alpha2.AgentType_Declarative {
+		// Get the ModelConfig for the team
+		modelConfig := &v1alpha2.ModelConfig{}
+		objKey := client.ObjectKey{
+			Namespace: agent.Namespace,
+			Name:      agent.Spec.Declarative.ModelConfig,
+		}
+		if err := h.KubeClient.Get(
+			ctx,
+			objKey,
+			modelConfig,
+		); err != nil {
+			if k8serrors.IsNotFound(err) {
+				log.V(1).Info("ModelConfig not found", "modelConfigRef", objKey)
+			} else {
+				log.Error(err, "Failed to get ModelConfig", "modelConfigRef", objKey)
+			}
+			return response, err
+		}
+		response.ModelProvider = modelConfig.Spec.Provider
+		response.Model = modelConfig.Spec.Model
+		response.ModelConfigRef = common.GetObjectRef(modelConfig)
+		response.Tools = agent.Spec.Declarative.Tools
+	}
+
+	return response, nil
 }
 
 // HandleGetAgent handles GET /api/agents/{namespace}/{name} requests using database
@@ -150,8 +164,8 @@ func (h *AgentsHandler) HandleCreateAgent(w ErrorResponseWriter, r *http.Request
 	}
 
 	log = log.WithValues(
-		"teamNamespace", agentRef.Namespace,
-		"teamName", agentRef.Name,
+		"agentNamespace", agentRef.Namespace,
+		"agentName", agentRef.Name,
 	)
 
 	kubeClientWrapper := utils.NewKubeClientWrapper(h.KubeClient)
