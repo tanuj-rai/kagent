@@ -134,14 +134,6 @@ export interface UpdateModelConfigPayload {
   anthropicVertexAI?: AnthropicVertexAIConfigPayload;
 }
 
-export interface PineconeConfigPayload {
-  indexHost: string;
-  topK?: number;
-  namespace?: string;
-  recordFields?: string[];
-  scoreThreshold?: string;
-}
-
 /**
  * Feedback issue types
  */
