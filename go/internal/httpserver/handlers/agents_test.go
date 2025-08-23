@@ -14,10 +14,11 @@ import (
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	"sigs.k8s.io/controller-runtime/pkg/client/fake"
 
-	"github.com/kagent-dev/kagent/go/controller/api/v1alpha2"
+	"github.com/kagent-dev/kagent/go/api/v1alpha2"
 	"github.com/kagent-dev/kagent/go/internal/adk"
 	"github.com/kagent-dev/kagent/go/internal/database"
 	database_fake "github.com/kagent-dev/kagent/go/internal/database/fake"
+	"github.com/kagent-dev/kagent/go/internal/httpserver/auth"
 	"github.com/kagent-dev/kagent/go/internal/httpserver/handlers"
 	common "github.com/kagent-dev/kagent/go/internal/utils"
 	"github.com/kagent-dev/kagent/go/pkg/client/api"
@@ -66,7 +67,7 @@ func setupTestHandler(objects ...client.Object) (*handlers.AgentsHandler, string
 		WithObjects(objects...).
 		Build()
 
-	userID := common.GetGlobalUserID()
+	userID := "test-user"
 	dbClient := database_fake.NewClient()
 
 	base := &handlers.Base{
@@ -76,6 +77,7 @@ func setupTestHandler(objects ...client.Object) (*handlers.AgentsHandler, string
 			Namespace: "default",
 		},
 		DatabaseService: dbClient,
+		Authorizer:      &auth.NoopAuthorizer{},
 	}
 
 	return handlers.NewAgentsHandler(base), userID
@@ -86,7 +88,7 @@ func createAgent(client database.Client, agent *v1alpha2.Agent) {
 		Config: &adk.AgentConfig{},
 		ID:     common.GetObjectRef(agent),
 	}
-	client.StoreAgent(dbAgent)
+	client.StoreAgent(dbAgent) //nolint:errcheck
 }
 
 func TestHandleGetAgent(t *testing.T) {
@@ -95,10 +97,11 @@ func TestHandleGetAgent(t *testing.T) {
 		team := createTestAgent("test-team", modelConfig)
 
 		handler, _ := setupTestHandler(team, modelConfig)
-		createAgent(handler.Base.DatabaseService, team)
+		createAgent(handler.DatabaseService, team)
 
 		req := httptest.NewRequest("GET", "/api/agents/default/test-team", nil)
 		req = mux.SetURLVars(req, map[string]string{"namespace": "default", "name": "test-team"})
+		req = setUser(req, "test-user")
 		w := httptest.NewRecorder()
 
 		handler.HandleGetAgent(&testErrorResponseWriter{w}, req)
@@ -132,10 +135,11 @@ func TestHandleGetAgent(t *testing.T) {
 		agent := createTestAgentWithStatus("test-agent-ready", modelConfig, conditions)
 
 		handler, _ := setupTestHandler(agent, modelConfig)
-		createAgent(handler.Base.DatabaseService, agent)
+		createAgent(handler.DatabaseService, agent)
 
 		req := httptest.NewRequest("GET", "/api/agents/default/test-agent-ready", nil)
 		req = mux.SetURLVars(req, map[string]string{"namespace": "default", "name": "test-agent-ready"})
+		req = setUser(req, "test-user")
 		w := httptest.NewRecorder()
 
 		handler.HandleGetAgent(&testErrorResponseWriter{w}, req)
@@ -160,10 +164,11 @@ func TestHandleGetAgent(t *testing.T) {
 		agent := createTestAgentWithStatus("test-agent-not-ready", modelConfig, conditions)
 
 		handler, _ := setupTestHandler(agent, modelConfig)
-		createAgent(handler.Base.DatabaseService, agent)
+		createAgent(handler.DatabaseService, agent)
 
 		req := httptest.NewRequest("GET", "/api/agents/default/test-agent-not-ready", nil)
 		req = mux.SetURLVars(req, map[string]string{"namespace": "default", "name": "test-agent-not-ready"})
+		req = setUser(req, "test-user")
 		w := httptest.NewRecorder()
 
 		handler.HandleGetAgent(&testErrorResponseWriter{w}, req)
@@ -188,10 +193,11 @@ func TestHandleGetAgent(t *testing.T) {
 		agent := createTestAgentWithStatus("test-agent-different-reason", modelConfig, conditions)
 
 		handler, _ := setupTestHandler(agent, modelConfig)
-		createAgent(handler.Base.DatabaseService, agent)
+		createAgent(handler.DatabaseService, agent)
 
 		req := httptest.NewRequest("GET", "/api/agents/default/test-agent-different-reason", nil)
 		req = mux.SetURLVars(req, map[string]string{"namespace": "default", "name": "test-agent-different-reason"})
+		req = setUser(req, "test-user")
 		w := httptest.NewRecorder()
 
 		handler.HandleGetAgent(&testErrorResponseWriter{w}, req)
@@ -209,6 +215,7 @@ func TestHandleGetAgent(t *testing.T) {
 
 		req := httptest.NewRequest("GET", "/api/agents/default/test-team", nil)
 		req = mux.SetURLVars(req, map[string]string{"namespace": "default", "name": "test-team"})
+		req = setUser(req, "test-user")
 		w := httptest.NewRecorder()
 
 		handler.HandleGetAgent(&testErrorResponseWriter{w}, req)
@@ -235,10 +242,12 @@ func TestHandleListAgents(t *testing.T) {
 		notReadyAgent := createTestAgent("not-ready-agent", modelConfig)
 
 		handler, _ := setupTestHandler(readyAgent, notReadyAgent, modelConfig)
-		createAgent(handler.Base.DatabaseService, readyAgent)
-		createAgent(handler.Base.DatabaseService, notReadyAgent)
+		createAgent(handler.DatabaseService, readyAgent)
+		createAgent(handler.DatabaseService, notReadyAgent)
 
 		req := httptest.NewRequest("GET", "/api/agents", nil)
+		req = setUser(req, "test-user")
+
 		w := httptest.NewRecorder()
 
 		handler.HandleListAgents(&testErrorResponseWriter{w}, req)
@@ -290,6 +299,7 @@ func TestHandleUpdateAgent(t *testing.T) {
 		req := httptest.NewRequest("PUT", "/api/agents/default/test-team", bytes.NewBuffer(body))
 		req = mux.SetURLVars(req, map[string]string{"namespace": "default", "name": "test-team"})
 		req.Header.Set("Content-Type", "application/json")
+		req = setUser(req, "test-user")
 		w := httptest.NewRecorder()
 
 		handler.HandleUpdateAgent(&testErrorResponseWriter{w}, req)
@@ -313,6 +323,7 @@ func TestHandleUpdateAgent(t *testing.T) {
 		req := httptest.NewRequest("PUT", "/api/agents/default/non-existent", bytes.NewBuffer(body))
 		req = mux.SetURLVars(req, map[string]string{"namespace": "default", "name": "non-existent"})
 		req.Header.Set("Content-Type", "application/json")
+		req = setUser(req, "test-user")
 		w := httptest.NewRecorder()
 
 		handler.HandleUpdateAgent(&testErrorResponseWriter{w}, req)
@@ -349,6 +360,7 @@ func TestHandleCreateAgent(t *testing.T) {
 		body, _ := json.Marshal(agent)
 		req := httptest.NewRequest("POST", "/api/agents", bytes.NewBuffer(body))
 		req.Header.Set("Content-Type", "application/json")
+		req = setUser(req, "test-user")
 		w := httptest.NewRecorder()
 
 		handler.HandleCreateAgent(&testErrorResponseWriter{w}, req)
@@ -372,10 +384,11 @@ func TestHandleDeleteTeam(t *testing.T) {
 		}
 
 		handler, _ := setupTestHandler(team)
-		createAgent(handler.Base.DatabaseService, team)
+		createAgent(handler.DatabaseService, team)
 
 		req := httptest.NewRequest("DELETE", "/api/agents/default/test-team", nil)
 		req = mux.SetURLVars(req, map[string]string{"namespace": "default", "name": "test-team"})
+		req = setUser(req, "test-user")
 		w := httptest.NewRecorder()
 
 		handler.HandleDeleteAgent(&testErrorResponseWriter{w}, req)
@@ -391,6 +404,7 @@ func TestHandleDeleteTeam(t *testing.T) {
 			"namespace": "default",
 			"name":      "non-existent",
 		})
+		req = setUser(req, "test-user")
 		w := httptest.NewRecorder()
 
 		handler.HandleDeleteAgent(&testErrorResponseWriter{w}, req)

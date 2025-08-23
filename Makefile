@@ -63,6 +63,9 @@ TOOLS_IMAGE_BUILD_ARGS += --build-arg TOOLS_BUN_VERSION=$(TOOLS_BUN_VERSION)
 TOOLS_IMAGE_BUILD_ARGS += --build-arg TOOLS_PYTHON_VERSION=$(TOOLS_PYTHON_VERSION)
 TOOLS_IMAGE_BUILD_ARGS += --build-arg TOOLS_NODE_VERSION=$(TOOLS_NODE_VERSION)
 
+# kmcp version extraction from go.mod
+KMCP_VERSION ?= $(shell $(AWK) '/github\.com\/kagent-dev\/kmcp/ { print substr($$2, 2) }' go/go.mod)
+
 HELM_ACTION=upgrade --install
 
 # Helm chart variables
@@ -76,6 +79,7 @@ print-tools-versions:
 	@echo "Tools Node   : $(TOOLS_NODE_VERSION)"
 	@echo "Tools Istio  : $(TOOLS_ISTIO_VERSION)"
 	@echo "Tools Argo CD: $(TOOLS_ARGO_CD_VERSION)"
+	@echo "KMCP Version : $(KMCP_VERSION)"
 
 # Check if OPENAI_API_KEY is set
 check-openai-key:
@@ -88,7 +92,7 @@ check-openai-key:
 .PHONY: buildx-create
 buildx-create:
 	docker buildx inspect $(BUILDX_BUILDER_NAME) 2>&1 > /dev/null || \
-	docker buildx create --name $(BUILDX_BUILDER_NAME) --platform linux/amd64,linux/arm64 --driver docker-container --use || true
+	docker buildx create --name $(BUILDX_BUILDER_NAME) --platform linux/amd64,linux/arm64 --driver docker-container --use --driver-opt network=host || true
 
 .PHONY: build-all  # for test purpose build all but output to /dev/null
 build-all: BUILD_ARGS ?= --progress=plain --builder $(BUILDX_BUILDER_NAME) --platform linux/amd64,linux/arm64 --output type=tar,dest=/dev/null
@@ -97,10 +101,15 @@ build-all: buildx-create
 	$(DOCKER_BUILDER) build $(BUILD_ARGS) $(TOOLS_IMAGE_BUILD_ARGS) -f ui/Dockerfile     ./ui
 	$(DOCKER_BUILDER) build $(BUILD_ARGS) $(TOOLS_IMAGE_BUILD_ARGS) -f python/Dockerfile ./python
 
+.PHONY: push-test-agent
+push-test-agent: build-kagent-adk
+	$(DOCKER_BUILDER) build --push --build-arg DOCKER_REGISTRY=$(DOCKER_REGISTRY) --build-arg VERSION=$(VERSION) -t $(DOCKER_REGISTRY)/kebab:latest -f go/test/e2e/agents/kebab/Dockerfile ./go/test/e2e/agents/kebab
+	kubectl apply --namespace kagent --context kind-$(KIND_CLUSTER_NAME) -f go/test/e2e/agents/kebab/agent.yaml
+
 .PHONY: create-kind-cluster
 create-kind-cluster:
-	sh ./scripts/kind/setup-kind.sh
-	sh ./scripts/kind/setup-metallb.sh
+	bash ./scripts/kind/setup-kind.sh
+	bash ./scripts/kind/setup-metallb.sh
 
 .PHONY: use-kind-cluster
 use-kind-cluster:
@@ -229,22 +238,15 @@ helm-tools:
 
 .PHONY: helm-version
 helm-version: helm-cleanup helm-agents helm-tools
-	VERSION=$(VERSION) envsubst < helm/kagent-crds/Chart-template.yaml > helm/kagent-crds/Chart.yaml
+	VERSION=$(VERSION) KMCP_VERSION=$(KMCP_VERSION) envsubst < helm/kagent-crds/Chart-template.yaml > helm/kagent-crds/Chart.yaml
 	VERSION=$(VERSION) envsubst < helm/kagent/Chart-template.yaml > helm/kagent/Chart.yaml
 	helm dependency update helm/kagent
+	helm dependency update helm/kagent-crds
 	helm package -d $(HELM_DIST_FOLDER) helm/kagent-crds
 	helm package -d $(HELM_DIST_FOLDER) helm/kagent
 
 .PHONY: helm-install-provider
 helm-install-provider: helm-version check-openai-key
-	helm $(HELM_ACTION) kmcp-crds oci://ghcr.io/kagent-dev/kmcp/helm/kmcp-crds \
-		--namespace kagent \
-		--create-namespace \
-		--history-max 2    \
-		--timeout 5m 			\
-		--kube-context kind-$(KIND_CLUSTER_NAME) \
-		--version 0.1.2 \
-		--wait
 	helm $(HELM_ACTION) kagent-crds helm/kagent-crds \
 		--namespace kagent \
 		--create-namespace \
@@ -287,7 +289,6 @@ helm-test-install: helm-install-provider
 helm-uninstall:
 	helm uninstall kagent --namespace kagent --kube-context kind-$(KIND_CLUSTER_NAME) --wait
 	helm uninstall kagent-crds --namespace kagent --kube-context kind-$(KIND_CLUSTER_NAME) --wait
-	helm uninstall kmcp-crds --namespace kagent --kube-context kind-$(KIND_CLUSTER_NAME) --wait
 
 .PHONY: helm-publish
 helm-publish: helm-version
@@ -311,7 +312,7 @@ kagent-cli-install: use-kind-cluster build-cli-local helm-version
 .PHONY: kagent-cli-port-forward
 kagent-cli-port-forward: use-kind-cluster
 	@echo "Port forwarding to kagent CLI..."
-	kubectl port-forward -n kagent service/kagent 8081:8081 8082:80 8084:8084
+	kubectl port-forward -n kagent service/kagent-controller 8083:8083
 
 .PHONY: kagent-addon-install
 kagent-addon-install: use-kind-cluster

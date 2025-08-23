@@ -4,7 +4,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/kagent-dev/kagent/go/controller/api/v1alpha1"
+	"github.com/kagent-dev/kagent/go/api/v1alpha1"
 )
 
 func TestGetModelProvider(t *testing.T) {
@@ -62,10 +62,10 @@ func TestGetModelProvider(t *testing.T) {
 	for _, tc := range testCases {
 		t.Run(tc.name, func(t *testing.T) {
 			if tc.envVarValue == "" {
-				os.Unsetenv(KAGENT_DEFAULT_MODEL_PROVIDER)
+				os.Unsetenv(KAGENT_DEFAULT_MODEL_PROVIDER) //nolint:errcheck
 			} else {
-				os.Setenv(KAGENT_DEFAULT_MODEL_PROVIDER, tc.expectedHelmKey)
-				defer os.Unsetenv(KAGENT_DEFAULT_MODEL_PROVIDER)
+				os.Setenv(KAGENT_DEFAULT_MODEL_PROVIDER, tc.expectedHelmKey) //nolint:errcheck
+				defer os.Unsetenv(KAGENT_DEFAULT_MODEL_PROVIDER)             //nolint:errcheck
 			}
 
 			result := GetModelProvider()

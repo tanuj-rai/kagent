@@ -5,13 +5,14 @@ import (
 	"net/http"
 
 	"github.com/go-logr/logr"
-	"github.com/kagent-dev/kagent/go/controller/api/v1alpha2"
-	"github.com/kagent-dev/kagent/go/controller/translator"
+	"github.com/kagent-dev/kagent/go/api/v1alpha2"
+	"github.com/kagent-dev/kagent/go/internal/controller/translator"
+	"github.com/kagent-dev/kagent/go/internal/httpserver/auth"
 	"github.com/kagent-dev/kagent/go/internal/httpserver/errors"
 	"github.com/kagent-dev/kagent/go/internal/utils"
-	common "github.com/kagent-dev/kagent/go/internal/utils"
 	"github.com/kagent-dev/kagent/go/pkg/client/api"
 	k8serrors "k8s.io/apimachinery/pkg/api/errors"
+	"k8s.io/apimachinery/pkg/types"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 	ctrllog "sigs.k8s.io/controller-runtime/pkg/log"
 )
@@ -30,6 +31,11 @@ func NewAgentsHandler(base *Base) *AgentsHandler {
 func (h *AgentsHandler) HandleListAgents(w ErrorResponseWriter, r *http.Request) {
 	log := ctrllog.FromContext(r.Context()).WithName("agents-handler").WithValues("operation", "list-db")
 
+	if err := Check(h.Authorizer, r, auth.Resource{Type: "Agent"}); err != nil {
+		w.RespondWithError(err)
+		return
+	}
+
 	agentList := &v1alpha2.AgentList{}
 	if err := h.KubeClient.List(r.Context(), agentList); err != nil {
 		w.RespondWithError(errors.NewInternalServerError("Failed to list Agents from Kubernetes", err))
@@ -38,7 +44,7 @@ func (h *AgentsHandler) HandleListAgents(w ErrorResponseWriter, r *http.Request)
 
 	agentsWithID := make([]api.AgentResponse, 0)
 	for _, agent := range agentList.Items {
-		agentRef := common.GetObjectRef(&agent)
+		agentRef := utils.GetObjectRef(&agent)
 		log.V(1).Info("Processing Agent", "agentRef", agentRef)
 
 		agentResponse, err := h.getAgentResponse(r.Context(), log, &agent)
@@ -57,7 +63,7 @@ func (h *AgentsHandler) HandleListAgents(w ErrorResponseWriter, r *http.Request)
 
 func (h *AgentsHandler) getAgentResponse(ctx context.Context, log logr.Logger, agent *v1alpha2.Agent) (api.AgentResponse, error) {
 
-	agentRef := common.GetObjectRef(agent)
+	agentRef := utils.GetObjectRef(agent)
 	log.V(1).Info("Processing Agent", "agentRef", agentRef)
 
 	deploymentReady := false
@@ -69,7 +75,7 @@ func (h *AgentsHandler) getAgentResponse(ctx context.Context, log logr.Logger, a
 	}
 
 	response := api.AgentResponse{
-		ID:              common.ConvertToPythonIdentifier(agentRef),
+		ID:              utils.ConvertToPythonIdentifier(agentRef),
 		Agent:           agent,
 		DeploymentReady: deploymentReady,
 	}
@@ -95,7 +101,7 @@ func (h *AgentsHandler) getAgentResponse(ctx context.Context, log logr.Logger, a
 		}
 		response.ModelProvider = modelConfig.Spec.Provider
 		response.Model = modelConfig.Spec.Model
-		response.ModelConfigRef = common.GetObjectRef(modelConfig)
+		response.ModelConfigRef = utils.GetObjectRef(modelConfig)
 		response.Tools = agent.Spec.Declarative.Tools
 	}
 
@@ -120,6 +126,10 @@ func (h *AgentsHandler) HandleGetAgent(w ErrorResponseWriter, r *http.Request) {
 	}
 	log = log.WithValues("agentNamespace", agentNamespace)
 
+	if err := Check(h.Authorizer, r, auth.Resource{Type: "Agent", Name: types.NamespacedName{Namespace: agentNamespace, Name: agentName}.String()}); err != nil {
+		w.RespondWithError(err)
+		return
+	}
 	agent := &v1alpha2.Agent{}
 	if err := h.KubeClient.Get(
 		r.Context(),
@@ -154,11 +164,11 @@ func (h *AgentsHandler) HandleCreateAgent(w ErrorResponseWriter, r *http.Request
 		return
 	}
 	if agentReq.Namespace == "" {
-		agentReq.Namespace = common.GetResourceNamespace()
+		agentReq.Namespace = utils.GetResourceNamespace()
 		log.V(4).Info("Namespace not provided in request. Creating in controller installation namespace",
 			"namespace", agentReq.Namespace)
 	}
-	agentRef, err := common.ParseRefString(agentReq.Name, agentReq.Namespace)
+	agentRef, err := utils.ParseRefString(agentReq.Name, agentReq.Namespace)
 	if err != nil {
 		w.RespondWithError(errors.NewBadRequestError("Invalid agent metadata", err))
 	}
@@ -168,8 +178,16 @@ func (h *AgentsHandler) HandleCreateAgent(w ErrorResponseWriter, r *http.Request
 		"agentName", agentRef.Name,
 	)
 
+	if err := Check(h.Authorizer, r, auth.Resource{Type: "Agent", Name: agentRef.String()}); err != nil {
+		w.RespondWithError(err)
+		return
+	}
+
 	kubeClientWrapper := utils.NewKubeClientWrapper(h.KubeClient)
-	kubeClientWrapper.AddInMemory(&agentReq)
+	if err := kubeClientWrapper.AddInMemory(&agentReq); err != nil {
+		w.RespondWithError(errors.NewInternalServerError("Failed to add Agent to Kubernetes wrapper", err))
+		return
+	}
 
 	apiTranslator := translator.NewAdkApiTranslator(
 		kubeClientWrapper,
@@ -206,11 +224,11 @@ func (h *AgentsHandler) HandleUpdateAgent(w ErrorResponseWriter, r *http.Request
 	}
 
 	if agentReq.Namespace == "" {
-		agentReq.Namespace = common.GetResourceNamespace()
+		agentReq.Namespace = utils.GetResourceNamespace()
 		log.V(4).Info("Namespace not provided in request. Creating in controller installation namespace",
 			"namespace", agentReq.Namespace)
 	}
-	agentRef, err := common.ParseRefString(agentReq.Name, agentReq.Namespace)
+	agentRef, err := utils.ParseRefString(agentReq.Name, agentReq.Namespace)
 	if err != nil {
 		w.RespondWithError(errors.NewBadRequestError("Invalid Agent metadata", err))
 	}
@@ -220,14 +238,16 @@ func (h *AgentsHandler) HandleUpdateAgent(w ErrorResponseWriter, r *http.Request
 		"agentName", agentRef.Name,
 	)
 
+	if err := Check(h.Authorizer, r, auth.Resource{Type: "Agent", Name: agentRef.String()}); err != nil {
+		w.RespondWithError(err)
+		return
+	}
+
 	log.V(1).Info("Getting existing Agent")
 	existingAgent := &v1alpha2.Agent{}
 	err = h.KubeClient.Get(
 		r.Context(),
-		client.ObjectKey{
-			Namespace: agentRef.Namespace,
-			Name:      agentRef.Name,
-		},
+		agentRef,
 		existingAgent,
 	)
 	if err != nil {
@@ -271,6 +291,12 @@ func (h *AgentsHandler) HandleDeleteAgent(w ErrorResponseWriter, r *http.Request
 		w.RespondWithError(errors.NewBadRequestError("Failed to get namespace from path", err))
 		return
 	}
+
+	if err := Check(h.Authorizer, r, auth.Resource{Type: "Agent", Name: types.NamespacedName{Namespace: agentNamespace, Name: agentName}.String()}); err != nil {
+		w.RespondWithError(err)
+		return
+	}
+
 	log = log.WithValues("agentNamespace", agentNamespace)
 
 	log.V(1).Info("Getting Agent from Kubernetes")

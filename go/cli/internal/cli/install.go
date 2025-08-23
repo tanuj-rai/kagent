@@ -3,11 +3,12 @@ package cli
 import (
 	"context"
 	"fmt"
-	"github.com/kagent-dev/kagent/go/internal/version"
 	"os"
 	"os/exec"
 	"strings"
 	"time"
+
+	"github.com/kagent-dev/kagent/go/internal/version"
 
 	"github.com/briandowns/spinner"
 	"github.com/kagent-dev/kagent/go/cli/internal/config"
@@ -44,11 +45,11 @@ func installChart(ctx context.Context, chartName string, namespace string, regis
 	return "", nil
 }
 
-func InstallCmd(ctx context.Context, cfg *config.Config) {
+func InstallCmd(ctx context.Context, cfg *config.Config) *PortForward {
 
 	if version.Version == "dev" {
 		fmt.Fprintln(os.Stderr, "Installation requires released version of kagent")
-		return
+		return nil
 	}
 
 	// get model provider from KAGENT_DEFAULT_MODEL_PROVIDER environment variable or use DefaultModelProvider
@@ -61,7 +62,7 @@ func InstallCmd(ctx context.Context, cfg *config.Config) {
 	if apiKeyName != "" && apiKeyValue == "" {
 		fmt.Fprintf(os.Stderr, "%s is not set\n", apiKeyName)
 		fmt.Fprintf(os.Stderr, "Please set the %s environment variable\n", apiKeyName)
-		return
+		return nil
 	}
 
 	// Build Helm values
@@ -78,9 +79,7 @@ func InstallCmd(ctx context.Context, cfg *config.Config) {
 
 	// split helmExtraArgs by "--set" to get additional values
 	extraValues := strings.Split(helmExtraArgs, "--set")
-	for _, hev := range extraValues {
-		values = append(values, hev)
-	}
+	values = append(values, extraValues...)
 
 	// spinner for installation progress
 	s := spinner.New(spinner.CharSets[35], 100*time.Millisecond)
@@ -103,7 +102,7 @@ func InstallCmd(ctx context.Context, cfg *config.Config) {
 			s.Start()
 		} else {
 			fmt.Fprintln(os.Stderr, "Error installing kagent-crds:", output)
-			return
+			return nil
 		}
 	}
 
@@ -113,32 +112,19 @@ func InstallCmd(ctx context.Context, cfg *config.Config) {
 		// Always stop the spinner before printing error messages
 		s.Stop()
 		fmt.Fprintln(os.Stderr, "Error installing kagent:", output)
-		return
-	}
-
-	// Create a new context for port-forward
-	pfCtx := context.Background()
-
-	portForwardCmd := exec.CommandContext(pfCtx, "kubectl", "-n", cfg.Namespace, "port-forward", "service/kagent", "8081:8081")
-	if err := portForwardCmd.Start(); err != nil {
-		s.Stop()
-		fmt.Fprintln(os.Stderr, "Error starting port-forward:", err)
-		return
-	}
-
-	// Wait for port-forward to be ready
-	time.Sleep(2 * time.Second)
-
-	// Check if port-forward is running
-	if portForwardCmd.Process == nil {
-		s.Stop()
-		fmt.Fprintln(os.Stderr, "Port-forward failed to start")
-		return
+		return nil
 	}
 
 	// Stop the spinner completely before printing the success message
 	s.Stop()
-	fmt.Fprintln(os.Stdout, "kagent installed successfully")
+	fmt.Fprintln(os.Stdout, "kagent installed successfully") //nolint:errcheck
+
+	pf, err := NewPortForward(ctx, cfg)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "Error starting port-forward: %v\n", err)
+		return nil
+	}
+	return pf
 }
 
 // deleteCRDs manually deletes Kubernetes CRDs for kagent
@@ -158,11 +144,11 @@ func deleteCRDs(ctx context.Context) error {
 		if out, err := deleteCmd.CombinedOutput(); err != nil {
 			if !strings.Contains(string(out), "not found") {
 				errMsg := fmt.Sprintf("Error deleting CRD %s: %s", crd, string(out))
-				fmt.Fprintln(os.Stderr, errMsg)
+				fmt.Fprintln(os.Stderr, errMsg) //nolint:errcheck
 				deleteErrors = append(deleteErrors, errMsg)
 			}
 		} else {
-			fmt.Fprintf(os.Stdout, "Successfully deleted CRD %s\n", crd)
+			fmt.Fprintf(os.Stdout, "Successfully deleted CRD %s\n", crd) //nolint:errcheck
 		}
 	}
 
@@ -228,5 +214,5 @@ func UninstallCmd(ctx context.Context, cfg *config.Config) {
 	}
 
 	s.Stop()
-	fmt.Fprintln(os.Stdout, "\nkagent uninstalled successfully")
+	fmt.Fprintln(os.Stdout, "\nkagent uninstalled successfully") //nolint:errcheck
 }

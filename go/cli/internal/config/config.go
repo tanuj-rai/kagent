@@ -10,8 +10,7 @@ import (
 )
 
 type Config struct {
-	APIURL       string `mapstructure:"api_url"`
-	UserID       string `mapstructure:"user_id"`
+	KAgentURL    string `mapstructure:"kagent_url"`
 	Namespace    string `mapstructure:"namespace"`
 	OutputFormat string `mapstructure:"output_format"`
 	Verbose      bool   `mapstructure:"verbose"`
@@ -36,8 +35,7 @@ func Init() error {
 	pflag.StringVar(&configFile, "config", configFile, "config file (default is $HOME/.kagent/config.yaml)")
 
 	// Set default values
-	viper.SetDefault("api_url", "http://localhost:8083/api")
-	viper.SetDefault("user_id", "admin@kagent.dev")
+	viper.SetDefault("kagent_url", "http://localhost:8083")
 	viper.SetDefault("output_format", "table")
 	viper.SetDefault("namespace", "kagent")
 

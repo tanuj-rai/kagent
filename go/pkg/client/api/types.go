@@ -1,8 +1,8 @@
 package api
 
 import (
-	"github.com/kagent-dev/kagent/go/controller/api/v1alpha1"
-	"github.com/kagent-dev/kagent/go/controller/api/v1alpha2"
+	"github.com/kagent-dev/kagent/go/api/v1alpha1"
+	"github.com/kagent-dev/kagent/go/api/v1alpha2"
 	"github.com/kagent-dev/kagent/go/internal/database"
 )
 
@@ -53,25 +53,31 @@ type ModelConfigResponse struct {
 
 // CreateModelConfigRequest represents a request to create a model configuration
 type CreateModelConfigRequest struct {
-	Ref             string                      `json:"ref"`
-	Provider        Provider                    `json:"provider"`
-	Model           string                      `json:"model"`
-	APIKey          string                      `json:"apiKey"`
-	OpenAIParams    *v1alpha2.OpenAIConfig      `json:"openAI,omitempty"`
-	AnthropicParams *v1alpha2.AnthropicConfig   `json:"anthropic,omitempty"`
-	AzureParams     *v1alpha2.AzureOpenAIConfig `json:"azureOpenAI,omitempty"`
-	OllamaParams    *v1alpha2.OllamaConfig      `json:"ollama,omitempty"`
+	Ref                     string                            `json:"ref"`
+	Provider                Provider                          `json:"provider"`
+	Model                   string                            `json:"model"`
+	APIKey                  string                            `json:"apiKey"`
+	OpenAIParams            *v1alpha2.OpenAIConfig            `json:"openAI,omitempty"`
+	AnthropicParams         *v1alpha2.AnthropicConfig         `json:"anthropic,omitempty"`
+	AzureParams             *v1alpha2.AzureOpenAIConfig       `json:"azureOpenAI,omitempty"`
+	OllamaParams            *v1alpha2.OllamaConfig            `json:"ollama,omitempty"`
+	GeminiParams            *v1alpha2.GeminiConfig            `json:"gemini,omitempty"`
+	GeminiVertexAIParams    *v1alpha2.GeminiVertexAIConfig    `json:"geminiVertexAI,omitempty"`
+	AnthropicVertexAIParams *v1alpha2.AnthropicVertexAIConfig `json:"anthropicVertexAI,omitempty"`
 }
 
 // UpdateModelConfigRequest represents a request to update a model configuration
 type UpdateModelConfigRequest struct {
-	Provider        Provider                    `json:"provider"`
-	Model           string                      `json:"model"`
-	APIKey          *string                     `json:"apiKey,omitempty"`
-	OpenAIParams    *v1alpha2.OpenAIConfig      `json:"openAI,omitempty"`
-	AnthropicParams *v1alpha2.AnthropicConfig   `json:"anthropic,omitempty"`
-	AzureParams     *v1alpha2.AzureOpenAIConfig `json:"azureOpenAI,omitempty"`
-	OllamaParams    *v1alpha2.OllamaConfig      `json:"ollama,omitempty"`
+	Provider                Provider                          `json:"provider"`
+	Model                   string                            `json:"model"`
+	APIKey                  *string                           `json:"apiKey,omitempty"`
+	OpenAIParams            *v1alpha2.OpenAIConfig            `json:"openAI,omitempty"`
+	AnthropicParams         *v1alpha2.AnthropicConfig         `json:"anthropic,omitempty"`
+	AzureParams             *v1alpha2.AzureOpenAIConfig       `json:"azureOpenAI,omitempty"`
+	OllamaParams            *v1alpha2.OllamaConfig            `json:"ollama,omitempty"`
+	GeminiParams            *v1alpha2.GeminiConfig            `json:"gemini,omitempty"`
+	GeminiVertexAIParams    *v1alpha2.GeminiVertexAIConfig    `json:"geminiVertexAI,omitempty"`
+	AnthropicVertexAIParams *v1alpha2.AnthropicVertexAIConfig `json:"anthropicVertexAI,omitempty"`
 }
 
 // Agent types
@@ -94,7 +100,6 @@ type AgentResponse struct {
 type SessionRequest struct {
 	AgentRef *string `json:"agent_ref,omitempty"`
 	Name     *string `json:"name,omitempty"`
-	UserID   string  `json:"user_id"`
 	ID       *string `json:"id,omitempty"`
 }
 
