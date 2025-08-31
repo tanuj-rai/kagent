@@ -224,7 +224,6 @@ export interface DeclarativeAgentSpec {
   tools: Tool[];
   // Name of the model config resource
   modelConfig: string;
-  memory?: string[];
   stream?: boolean;
   a2aConfig?: A2AConfig;
 }
@@ -275,7 +274,6 @@ export interface AgentResponse {
   model: string;
   modelProvider: string;
   modelConfigRef: string;
-  memoryRefs: string[];
   tools: Tool[];
   deploymentReady: boolean;
   accepted: boolean;
