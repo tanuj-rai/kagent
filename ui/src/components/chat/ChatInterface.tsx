@@ -383,8 +383,11 @@ export default function ChatInterface({ selectedAgentName, selectedNamespace, se
             onKeyDown={handleKeyDown}
             className={`min-h-[100px] border-0 shadow-none p-0 focus-visible:ring-0 resize-none ${chatStatus !== "ready" ? "opacity-50 cursor-not-allowed" : ""}`}
             disabled={chatStatus !== "ready"}
+            aria-label="Type your message and press Ctrl+Enter to send"
           />
-
+          <span className="text-xs text-gray-400 mt-1 block">
+            Press Ctrl+Enter to send
+          </span>
           <div className="flex items-center justify-end gap-2 mt-4">
             <Button type="submit" className={""} disabled={!currentInputMessage.trim() || chatStatus !== "ready"}>
               Send
