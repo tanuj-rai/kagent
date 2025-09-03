@@ -34,7 +34,7 @@ export const getStatusInfo = (status: ChatStatus): StatusInfo => {
     case "ready":
       return {
         text: "Ready",
-        placeholder: "Send a message..."
+        placeholder: "press Ctrl+Enter to send..."
       };
     case "thinking":
       return {
@@ -79,7 +79,7 @@ export const getStatusInfo = (status: ChatStatus): StatusInfo => {
     default:
       return {
         text: "Ready",
-        placeholder: "Send a message..."
+        placeholder: "press Ctrl+Enter to send..."
       };
   }
 };
